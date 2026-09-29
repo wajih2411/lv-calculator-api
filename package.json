@@ -1,0 +1,24 @@
+{
+  "name": "lv-calculator-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wajih2411/lv-calculator-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/wajih2411/lv-calculator-api/issues"
+  },
+  "homepage": "https://github.com/wajih2411/lv-calculator-api#readme",
+  "devDependencies": {
+    "jest": "^30.5.2"
+  }
+}
