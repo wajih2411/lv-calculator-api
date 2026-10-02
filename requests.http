@@ -1,0 +1,21 @@
+@baseUrl = https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/YOUR_STAGE
+
+### Valid request: expect 200
+POST {{baseUrl}}/calculate
+Content-Type: application/json
+
+{
+  "cameraCount": 10,
+  "resolution": "1080p",
+  "retentionDays": 30
+}
+
+### Invalid request: expect 400 (cameraCount must be at least 1)
+POST {{baseUrl}}/calculate
+Content-Type: application/json
+
+{
+  "cameraCount": 0,
+  "resolution": "1080p",
+  "retentionDays": 30
+}
