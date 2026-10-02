@@ -1,4 +1,4 @@
-@baseUrl = https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/YOUR_STAGE
+@baseUrl = https://qnqt2bax3b.execute-api.us-east-1.amazonaws.com
 
 ### Valid request: expect 200
 POST {{baseUrl}}/calculate
