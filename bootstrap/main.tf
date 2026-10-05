@@ -175,6 +175,24 @@ resource "aws_iam_role_policy" "github_deploy" {
         Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/lv-calculator*"
       },
       {
+        Sid      = "Alerts"
+        Effect   = "Allow"
+        Action   = ["sns:*"]
+        Resource = "arn:aws:sns:${local.region}:${local.account_id}:lv-calculator-*"
+      },
+      {
+        Sid      = "AlarmsManage"
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:TagResource", "cloudwatch:UntagResource", "cloudwatch:ListTagsForResource"]
+        Resource = "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:lv-calculator-*"
+      },
+      {
+        Sid      = "AlarmsDescribe"
+        Effect   = "Allow"
+        Action   = ["cloudwatch:DescribeAlarms"]
+        Resource = "*"
+      },
+      {
         Sid      = "AppIamRolesMustHaveBoundary"
         Effect   = "Allow"
         Action   = ["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"]

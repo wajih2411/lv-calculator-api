@@ -58,6 +58,8 @@ jobs:
     permissions:
       id-token: write # lets GitHub issue an OIDC token for AWS
       contents: read
+    env:
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
     defaults:
       run:
         working-directory: terraform

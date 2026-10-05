@@ -9,3 +9,9 @@ variable "project_name" {
   type        = string
   default     = "lv-calculator"
 }
+
+variable "alert_email" {
+  description = "Email address that receives CloudWatch alarm notifications"
+  type        = string
+  sensitive   = true
+}

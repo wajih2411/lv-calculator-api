@@ -103,6 +103,21 @@ terraform -chdir=bootstrap init
 terraform -chdir=bootstrap apply
 ```
 
+## Monitoring
+
+Two CloudWatch alarms watch the live API:
+
+- **Lambda errors**: the function crashed or timed out.
+- **API 5xx**: the API returned a server error.
+
+Both notify an SNS topic that emails the owner when an alarm fires and again when it clears. AWS sends a confirmation email to the address first; alerts only arrive after the link in it is clicked.
+
+The address comes from the `ALERT_EMAIL` GitHub secret in CI. When running Terraform locally, set it yourself:
+
+```sh
+export TF_VAR_alert_email="you@example.com"
+```
+
 ## Running tests
 
 ```sh
