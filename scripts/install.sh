@@ -51,7 +51,21 @@ echo
 echo "Calculate endpoint: $ENDPOINT"
 
 echo "==> Smoke test (10 cameras, 1080p, 30 days)"
-curl -sS --fail-with-body -X POST "$ENDPOINT" \
-  -H 'Content-Type: application/json' \
-  -d '{"cameraCount": 10, "resolution": "1080p", "retentionDays": 30}'
-echo
+# API Gateway takes a few seconds to serve new routes after apply, so retry before giving up.
+MAX_ATTEMPTS=10
+for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  if RESPONSE="$(curl -sS --fail-with-body -X POST "$ENDPOINT" \
+    -H 'Content-Type: application/json' \
+    -d '{"cameraCount": 10, "resolution": "1080p", "retentionDays": 30}')"; then
+    echo "Smoke test succeeded on attempt $attempt of $MAX_ATTEMPTS:"
+    echo "$RESPONSE"
+    exit 0
+  fi
+  if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+    echo "Attempt $attempt of $MAX_ATTEMPTS failed, retrying in 3 seconds..."
+    sleep 3
+  fi
+done
+
+echo "Smoke test failed after $MAX_ATTEMPTS attempts. Last response: $RESPONSE" >&2
+exit 1
