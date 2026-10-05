@@ -112,7 +112,12 @@ resource "aws_iam_role" "github_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/main"
+          # The second value is GitHub's immutable, ID-based subject (owner and repo IDs),
+          # which this repo's tokens use; it survives renames.
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:${var.github_repo}:ref:refs/heads/main",
+            "repo:wajih2411@149012294/lv-calculator-api@1389740334:ref:refs/heads/main",
+          ]
         }
       }
     }]
