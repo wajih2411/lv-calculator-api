@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # Zips the src/ folder automatically on every plan/apply - no more manual zipping.
 data "archive_file" "lambda_zip" {
   type        = "zip"
@@ -7,7 +9,8 @@ data "archive_file" "lambda_zip" {
 
 # The IAM role the Lambda runs as. Only the Lambda service may assume it.
 resource "aws_iam_role" "lambda_exec" {
-  name = "${var.project_name}-lambda-role"
+  name                 = "${var.project_name}-lambda-role"
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/lv-calculator-app-boundary"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

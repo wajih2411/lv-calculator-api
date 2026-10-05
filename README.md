@@ -85,6 +85,24 @@ curl "$(terraform -chdir=terraform output -raw history_endpoint)?limit=5"
 
 This deletes all AWS resources for this project (Terraform asks for confirmation; `--auto-approve` skips it). Add `--clean` to also remove local files (`node_modules`, `terraform/.terraform`, `terraform/build`) after a successful destroy.
 
+## CI/CD
+
+GitHub Actions (`.github/workflows/deploy.yml`) runs on every pull request and every push to `main`:
+
+- **Pull requests** run the unit tests and `terraform fmt` / `terraform validate`. They never touch AWS.
+- **Pushes to `main`** run the same checks, then deploy with Terraform and smoke-test the live endpoint.
+
+The deploy job authenticates to AWS with OIDC, so no access keys are stored in GitHub. It assumes a least-privilege deploy role that can only manage this project's resources, and only workflows on the `main` branch of this repo can assume it. The role's ARN is stored as the `AWS_ROLE_ARN` repository secret.
+
+Terraform state lives in an S3 bucket with S3-native locking, so GitHub Actions and local runs share one state and can't apply at the same time.
+
+The `bootstrap/` folder creates what the pipeline depends on: the state bucket, the GitHub OIDC provider, the deploy role, and the permissions boundary that caps what the app's own IAM roles can do. Run it once, locally, with your own AWS credentials:
+
+```sh
+terraform -chdir=bootstrap init
+terraform -chdir=bootstrap apply
+```
+
 ## Running tests
 
 ```sh

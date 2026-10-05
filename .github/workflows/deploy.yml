@@ -1,0 +1,102 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at the same time.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+  validate:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate (no AWS access needed)
+        working-directory: terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  deploy:
+    name: Deploy to AWS
+    needs: [test, validate]
+    # Only deploy from main - never from pull requests.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # lets GitHub issue an OIDC token for AWS
+      contents: read
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Get temporary AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply
+        run: terraform apply -input=false tfplan
+
+      - name: Smoke test
+        run: |
+          URL="$(terraform output -raw calculate_endpoint)"
+          for attempt in $(seq 1 10); do
+            if curl -sS --fail-with-body -X POST "$URL" \
+              -H 'Content-Type: application/json' \
+              -d '{"cameraCount": 1, "resolution": "1080p", "retentionDays": 1}'; then
+              echo
+              echo "Smoke test passed on attempt $attempt"
+              exit 0
+            fi
+            echo "Attempt $attempt failed, retrying in 3s..."
+            sleep 3
+          done
+          echo "Smoke test failed after 10 attempts"
+          exit 1
