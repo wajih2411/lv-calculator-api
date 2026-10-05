@@ -1,27 +1,55 @@
 # lv-calculator-api
 
-A small serverless API that estimates bandwidth and storage for a camera system.
+[![CI/CD](https://github.com/wajih2411/lv-calculator-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/wajih2411/lv-calculator-api/actions/workflows/deploy.yml)
 
-## How it works
+A serverless API that sizes a low-voltage camera system, deployed to AWS with Terraform and GitHub Actions.
 
-API Gateway -> Lambda (Node.js) -> JSON, with each calculation saved to DynamoDB. All AWS resources are provisioned with Terraform (see `terraform/`).
+## What it does
 
-## Prerequisites
+Give it a camera count, resolution and retention period, and it estimates the network bandwidth, recording storage, PoE power load, heat load in BTU/hr and UPS runtime for the system. Every calculation is saved and can be retrieved later through a history endpoint.
 
-- Node.js (with npm)
-- Terraform
-- AWS CLI, configured (`aws configure`)
-- An AWS account
+## Architecture
 
-## Install
-
-```sh
-./scripts/install.sh
+```mermaid
+flowchart LR
+  Client([Client]) -->|POST /calculate<br>GET /history| APIGW[API Gateway<br>HTTP API]
+  APIGW --> Lambda[Lambda<br>Node.js 22]
+  Lambda -->|PutItem / Query| DDB[(DynamoDB<br>30-day TTL)]
+  Lambda --> Logs[CloudWatch Logs]
+  Lambda -.metrics.-> Alarms[CloudWatch Alarms]
+  APIGW -.metrics.-> Alarms
+  Alarms --> SNS[SNS] --> Email([Email alert])
+  GH[GitHub Actions] -->|OIDC, no stored keys| AWS{{Deploy role}}
+  AWS -->|terraform apply| APIGW
+  State[(S3<br>Terraform state)] --- GH
 ```
 
-This checks prerequisites, runs the tests, deploys to AWS, and prints the endpoint. Terraform asks for confirmation before deploying; pass `--auto-approve` to skip it.
+## Tech stack
 
-## Example
+- **Runtime:** Node.js 22 on AWS Lambda (arm64)
+- **API:** API Gateway HTTP API
+- **Data:** DynamoDB, on-demand, with TTL
+- **Monitoring:** CloudWatch Logs and Alarms, SNS email
+- **Infrastructure as code:** Terraform, state in S3
+- **CI/CD:** GitHub Actions with OIDC
+- **Tests:** Jest
+
+## Design decisions
+
+- **Serverless instead of EC2.** Lambda bills per request and there are no servers to patch or keep running for an API that is idle most of the time.
+- **HTTP API instead of REST API.** It is simpler and cheaper, and this project needs none of the REST API extras.
+- **DynamoDB on-demand with TTL.** There is no capacity to plan, and DynamoDB deletes each item itself after 30 days, so there is no cleanup job.
+- **Single partition key.** All calculations share one partition, sorted by time, which makes "most recent" a single query. That is fine at this scale; a high-traffic version would spread writes across several keys.
+- **Math separate from the handler.** The formulas live in `src/calculator.js` with no AWS code, so they are tested without mocks or an AWS account.
+- **400 versus 500.** Bad input raises a `ValidationError` and returns a 400 that says what to fix. Anything else is logged to CloudWatch and returns a generic 500, so internals never leak.
+- **OIDC instead of access keys.** GitHub Actions gets short-lived credentials for each run, so there is no long-lived key to leak or rotate.
+- **Permissions boundary.** The deploy role can only create IAM roles capped by a boundary policy, so it cannot grant itself or the app more access than the app needs.
+- **S3 remote state with native locking.** CI and local runs share one state file, and two applies cannot run at once.
+- **Cost controls.** API throttling (5 requests/second, burst of 10) limits abuse, and logs expire after 14 days.
+
+## API
+
+### POST /calculate
 
 ```sh
 curl -X POST "$(terraform -chdir=terraform output -raw calculate_endpoint)" \
@@ -54,9 +82,20 @@ Only `cameraCount`, `resolution` and `retentionDays` are required. `upsRuntimeMi
 
 The response also includes an `id` and `createdAt`: every calculation is saved to DynamoDB and deleted automatically after 30 days.
 
-## History
+| Field | Required | Default | Notes |
+|---|---|---|---|
+| `cameraCount` | yes | | Whole number, at least 1 |
+| `resolution` | yes | | `1080p`, `4MP`, `5MP` or `4K` |
+| `retentionDays` | yes | | Greater than 0 |
+| `recordingHoursPerDay` | no | 24 | Up to 24 |
+| `wattsPerCamera` | no | 12.95 | PoE (802.3af) maximum at the camera |
+| `additionalLoadWatts` | no | 0 | Switches, recorder and other equipment |
+| `upsBatteryWh` | no | | Enables the UPS runtime estimate |
+| `upsEfficiency` | no | 0.9 | Between 0 and 1 |
 
-`GET /history` returns the most recent calculations, newest first. The optional `?limit=` accepts 1-50 (default 10).
+### GET /history
+
+Returns the most recent calculations, newest first. The optional `?limit=` accepts 1-50 (default 10).
 
 ```sh
 curl "$(terraform -chdir=terraform output -raw history_endpoint)?limit=5"
@@ -76,6 +115,23 @@ curl "$(terraform -chdir=terraform output -raw history_endpoint)?limit=5"
 ```
 
 `result` holds the full calculation output (shortened here).
+
+## Install
+
+Prerequisites:
+
+- Node.js (with npm)
+- Terraform 1.10 or later
+- AWS CLI, configured (`aws configure`)
+- An AWS account
+
+The first time, create the shared infrastructure (see [CI/CD](#cicd)) and set the alert address (see [Monitoring](#monitoring)). S3 bucket names are global, so in your own account change the bucket name in `bootstrap/variables.tf` and `terraform/providers.tf` first.
+
+```sh
+./scripts/install.sh
+```
+
+This checks prerequisites, runs the tests, deploys to AWS, and prints the endpoint. Terraform asks for confirmation before deploying; pass `--auto-approve` to skip it.
 
 ## Uninstall
 
@@ -123,3 +179,20 @@ export TF_VAR_alert_email="you@example.com"
 ```sh
 npm test
 ```
+
+The tests mock DynamoDB, so they need no AWS account or network access.
+
+## Cost
+
+At hobby traffic this runs within or near the AWS free tier:
+
+- **Lambda and API Gateway** are pay-per-request, so an idle API costs nothing.
+- **DynamoDB** is on-demand, billed per read and write, and TTL keeps the table small.
+- **S3 state** is a single small file, costing cents per month.
+
+## Known limitations & future work
+
+- **No authentication.** Anyone with the URL can call the API and read the history. Next: API keys or Cognito.
+- **Single region.** There is no failover if the region has an outage.
+- **Pull requests don't run `terraform plan` against AWS.** Next: a read-only plan role for PRs.
+- **Rule-of-thumb bitrates.** Calculations use typical H.264 values per resolution, not vendor-specific figures.
