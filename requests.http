@@ -19,3 +19,6 @@ Content-Type: application/json
   "resolution": "1080p",
   "retentionDays": 30
 }
+
+### Recent history
+GET {{baseUrl}}/history?limit=5

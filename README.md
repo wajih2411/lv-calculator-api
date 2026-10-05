@@ -4,7 +4,7 @@ A small serverless API that estimates bandwidth and storage for a camera system.
 
 ## How it works
 
-API Gateway -> Lambda (Node.js) -> JSON. All AWS resources are provisioned with Terraform (see `terraform/`).
+API Gateway -> Lambda (Node.js) -> JSON, with each calculation saved to DynamoDB. All AWS resources are provisioned with Terraform (see `terraform/`).
 
 ## Prerequisites
 
@@ -51,6 +51,31 @@ curl -X POST "$(terraform -chdir=terraform output -raw calculate_endpoint)" \
 ```
 
 Only `cameraCount`, `resolution` and `retentionDays` are required. `upsRuntimeMinutes` is `null` unless `upsBatteryWh` is given.
+
+The response also includes an `id` and `createdAt`: every calculation is saved to DynamoDB and deleted automatically after 30 days.
+
+## History
+
+`GET /history` returns the most recent calculations, newest first. The optional `?limit=` accepts 1-50 (default 10).
+
+```sh
+curl "$(terraform -chdir=terraform output -raw history_endpoint)?limit=5"
+```
+
+```json
+{
+  "count": 1,
+  "items": [
+    {
+      "id": "3f2b8c1e-5d47-4a90-9c1b-7e6a2d4f8b10",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "result": { "storageTB": 12.96, "totalBandwidthMbps": 40 }
+    }
+  ]
+}
+```
+
+`result` holds the full calculation output (shortened here).
 
 ## Uninstall
 

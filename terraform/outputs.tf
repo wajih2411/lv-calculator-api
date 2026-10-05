@@ -11,3 +11,12 @@ output "calculate_endpoint" {
 output "lambda_function_name" {
   value = aws_lambda_function.calculator.function_name
 }
+
+output "history_endpoint" {
+  description = "URL for recent calculation history"
+  value       = "${aws_apigatewayv2_stage.default.invoke_url}history"
+}
+
+output "dynamodb_table_name" {
+  value = aws_dynamodb_table.history.name
+}
