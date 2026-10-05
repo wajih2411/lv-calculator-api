@@ -18,3 +18,22 @@ describe('Lambda handler', () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe('Lambda handler errors', () => {
+  test('returns 500 with a generic message for unexpected errors', async () => {
+    jest.resetModules();
+    jest.doMock('../src/calculator', () => ({
+      ...jest.requireActual('../src/calculator'),
+      calculateCameraSystem: () => {
+        throw new Error('something broke');
+      },
+    }));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { handler: brokenHandler } = require('../src/handler');
+    const res = await brokenHandler({ body: '{}' });
+
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).toBe('Internal server error');
+  });
+});

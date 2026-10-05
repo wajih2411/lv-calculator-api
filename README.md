@@ -26,7 +26,7 @@ This checks prerequisites, runs the tests, deploys to AWS, and prints the endpoi
 ```sh
 curl -X POST "$(terraform -chdir=terraform output -raw calculate_endpoint)" \
   -H 'Content-Type: application/json' \
-  -d '{"cameraCount": 10, "resolution": "1080p", "retentionDays": 30}'
+  -d '{"cameraCount": 10, "resolution": "1080p", "retentionDays": 30, "additionalLoadWatts": 50, "upsBatteryWh": 1000}'
 ```
 
 ```json
@@ -35,13 +35,22 @@ curl -X POST "$(terraform -chdir=terraform output -raw calculate_endpoint)" \
     "cameraCount": 10,
     "resolution": "1080p",
     "retentionDays": 30,
-    "recordingHoursPerDay": 24
+    "recordingHoursPerDay": 24,
+    "wattsPerCamera": 12.95,
+    "additionalLoadWatts": 50,
+    "upsBatteryWh": 1000,
+    "upsEfficiency": 0.9
   },
   "bitratePerCameraMbps": 4,
   "totalBandwidthMbps": 40,
-  "storageTB": 12.96
+  "storageTB": 12.96,
+  "totalLoadWatts": 179.5,
+  "heatLoadBtuPerHour": 612.5,
+  "upsRuntimeMinutes": 300.8
 }
 ```
+
+Only `cameraCount`, `resolution` and `retentionDays` are required. `upsRuntimeMinutes` is `null` unless `upsBatteryWh` is given.
 
 ## Uninstall
 
