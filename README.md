@@ -10,19 +10,9 @@ Give it a camera count, resolution and retention period, and it estimates the ne
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  Client([Client]) -->|POST /calculate<br>GET /history| APIGW[API Gateway<br>HTTP API]
-  APIGW --> Lambda[Lambda<br>Node.js 22]
-  Lambda -->|PutItem / Query| DDB[(DynamoDB<br>30-day TTL)]
-  Lambda --> Logs[CloudWatch Logs]
-  Lambda -.metrics.-> Alarms[CloudWatch Alarms]
-  APIGW -.metrics.-> Alarms
-  Alarms --> SNS[SNS] --> Email([Email alert])
-  GH[GitHub Actions] -->|OIDC, no stored keys| AWS{{Deploy role}}
-  AWS -->|terraform apply| APIGW
-  State[(S3<br>Terraform state)] --- GH
-```
+![Architecture diagram](docs/architecture.png)
+
+Diagram generated from code with the Python `diagrams` library (`docs/architecture.py`).
 
 ## Tech stack
 
@@ -148,7 +138,7 @@ GitHub Actions (`.github/workflows/deploy.yml`) runs on every pull request and e
 - **Pull requests** run the unit tests and `terraform fmt` / `terraform validate`. They never touch AWS.
 - **Pushes to `main`** run the same checks, then deploy with Terraform and smoke-test the live endpoint.
 
-The deploy job authenticates to AWS with OIDC, so no access keys are stored in GitHub. It assumes a least-privilege deploy role that can only manage this project's resources, and only workflows on the `main` branch of this repo can assume it. The role's ARN is stored as the `AWS_ROLE_ARN` repository secret.
+The deploy job authenticates to AWS with OIDC, so no access keys are stored in GitHub. It assumes a resource-scoped deploy role that can only manage this project's resources, and only workflows on the `main` branch of this repo can assume it. The role's ARN is stored as the `AWS_ROLE_ARN` repository secret.
 
 Terraform state lives in an S3 bucket with S3-native locking, so GitHub Actions and local runs share one state and can't apply at the same time.
 

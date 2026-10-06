@@ -147,3 +147,4 @@ function.zip
 *.tfstate.*
 terraform/build/
 crash.log
+.venv/
