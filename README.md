@@ -2,11 +2,15 @@
 
 [![CI/CD](https://github.com/wajih2411/lv-calculator-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/wajih2411/lv-calculator-api/actions/workflows/deploy.yml)
 
-A serverless API that sizes a low-voltage camera system, deployed to AWS with Terraform and GitHub Actions.
+**Live demo:** https://d2uobnkpu5jtt4.cloudfront.net
+
+A serverless API and website (the Camera Infrastructure Calculator) that sizes a low-voltage camera system, deployed to AWS with Terraform and GitHub Actions.
 
 ## What it does
 
 Give it a camera count, resolution and retention period, and it estimates the network bandwidth, recording storage, PoE power load, heat load in BTU/hr and UPS runtime for the system. Every calculation is saved and can be retrieved later through a history endpoint.
+
+The Camera Infrastructure Calculator is a web interface to the same API: it runs calculations and shows the history in the browser.
 
 ## Architecture
 
@@ -19,6 +23,7 @@ Diagram generated from code with the Python `diagrams` library (`docs/architectu
 - **Runtime:** Node.js 22 on AWS Lambda (arm64)
 - **API:** API Gateway HTTP API
 - **Data:** DynamoDB, on-demand, with TTL
+- **Frontend:** HTML/CSS/JS with Motion animations, on S3 + CloudFront (Origin Access Control)
 - **Monitoring:** CloudWatch Logs and Alarms, SNS email
 - **Infrastructure as code:** Terraform, state in S3
 - **CI/CD:** GitHub Actions with OIDC
@@ -36,6 +41,8 @@ Diagram generated from code with the Python `diagrams` library (`docs/architectu
 - **Permissions boundary.** The deploy role can only create IAM roles capped by a boundary policy, so it cannot grant itself or the app more access than the app needs.
 - **S3 remote state with native locking.** CI and local runs share one state file, and two applies cannot run at once.
 - **Cost controls.** API throttling (5 requests/second, burst of 10) limits abuse, and logs expire after 14 days.
+- **Private site bucket behind CloudFront (OAC).** The S3 bucket is private and Origin Access Control lets only CloudFront read the site files. CloudFront serves them over HTTPS with managed security headers.
+- **CORS limited to the site.** The API only allows the CloudFront origin, so browsers on other sites can't call it.
 
 ## API
 
@@ -179,6 +186,7 @@ At hobby traffic this runs within or near the AWS free tier:
 - **Lambda and API Gateway** are pay-per-request, so an idle API costs nothing.
 - **DynamoDB** is on-demand, billed per read and write, and TTL keeps the table small.
 - **S3 state** is a single small file, costing cents per month.
+- **The website** uses CloudFront and a small S3 bucket, which fall within or near the free tier at demo traffic: CloudFront's always-free tier covers far more traffic than this site gets, and S3 storage for a few small files costs pennies.
 
 ## Known limitations & future work
 
@@ -186,3 +194,4 @@ At hobby traffic this runs within or near the AWS free tier:
 - **Single region.** There is no failover if the region has an outage.
 - **Pull requests don't run `terraform plan` against AWS.** Next: a read-only plan role for PRs.
 - **Rule-of-thumb bitrates.** Calculations use typical H.264 values per resolution, not vendor-specific figures.
+- **Account-wide CloudFront permissions.** The deploy role has `cloudfront:*` on all distributions, because distributions get random IDs and can't be scoped by name.

@@ -10,7 +10,7 @@ from diagrams.aws.compute import Lambda
 from diagrams.aws.database import Dynamodb
 from diagrams.aws.integration import SNS
 from diagrams.aws.management import CloudwatchAlarm, CloudwatchLogs
-from diagrams.aws.network import APIGateway
+from diagrams.aws.network import APIGateway, CloudFront
 from diagrams.aws.security import IAMRole
 from diagrams.aws.storage import S3
 from diagrams.onprem.ci import GithubActions
@@ -51,7 +51,14 @@ with Diagram(
             role = IAMRole("Deploy role\nresource-scoped\n+ boundary")
             exec_role = IAMRole("Lambda exec role\nPutItem/Query\n1 table + boundary")
 
+        # CloudFront is a global edge service, so it sits outside the Region box.
+        with Cluster("Edge (global)", graph_attr={"margin": "24"}):
+            cdn = CloudFront("CloudFront\nHTTPS, cached")
+
         with Cluster("Region: us-east-1"):
+            with Cluster("Website", graph_attr={"margin": "24"}):
+                site = S3("Site bucket\nprivate (OAC)")
+
             with Cluster("Request path"):
                 api = APIGateway("API Gateway\nHTTP API\n(throttled)")
                 fn = Lambda("Lambda\nNode.js 22")
@@ -69,10 +76,12 @@ with Diagram(
         repo = Github("Repository")
         ci = GithubActions("GitHub Actions\nCI/CD")
 
-    # 1-3: request path
-    client >> Edge(label="1. POST /calculate\n    GET /history\n(public demo, no auth)", **REQUEST) >> api
-    api >> Edge(label="2. invoke", **REQUEST) >> fn
-    fn >> Edge(label="3. save / read", **REQUEST) >> table
+    # 1-4: request path
+    client >> Edge(label="1. open website", **REQUEST) >> cdn
+    cdn >> Edge(label="static files", **REQUEST) >> site
+    client >> Edge(label="2. POST /calculate\n    GET /history\n(CORS: site only,\npublic demo, no auth)", **REQUEST) >> api
+    api >> Edge(label="3. invoke", **REQUEST) >> fn
+    fn >> Edge(label="4. save / read", **REQUEST) >> table
     exec_role >> Edge(label="assumed by", style="dotted", color="#7D8998") >> fn
 
     # A-C: monitoring and alerting
