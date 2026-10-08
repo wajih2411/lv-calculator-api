@@ -148,3 +148,4 @@ function.zip
 terraform/build/
 crash.log
 .venv/
+web/config.js

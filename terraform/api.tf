@@ -1,6 +1,15 @@
 resource "aws_apigatewayv2_api" "http" {
   name          = "${var.project_name}-api"
   protocol_type = "HTTP"
+
+  # Browsers may only call the API from the website. The CloudFront distribution
+  # doesn't depend on the API, so there's no cycle.
+  cors_configuration {
+    allow_origins = ["https://${aws_cloudfront_distribution.site.domain_name}"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["content-type"]
+    max_age       = 3600
+  }
 }
 
 resource "aws_apigatewayv2_integration" "lambda" {

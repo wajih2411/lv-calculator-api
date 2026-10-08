@@ -20,3 +20,8 @@ output "history_endpoint" {
 output "dynamodb_table_name" {
   value = aws_dynamodb_table.history.name
 }
+
+output "website_url" {
+  description = "Public URL of the website"
+  value       = "https://${aws_cloudfront_distribution.site.domain_name}"
+}

@@ -212,6 +212,19 @@ resource "aws_iam_role_policy" "github_deploy" {
         ]
         Resource = "arn:aws:iam::${local.account_id}:role/lv-calculator-*"
       },
+      {
+        Sid      = "SiteBucket"
+        Effect   = "Allow"
+        Action   = ["s3:*"]
+        Resource = ["arn:aws:s3:::lv-calculator-site-*", "arn:aws:s3:::lv-calculator-site-*/*"]
+      },
+      {
+        # CloudFront IDs are random, so distributions can't be scoped by name.
+        Sid      = "CloudFront"
+        Effect   = "Allow"
+        Action   = ["cloudfront:*"]
+        Resource = "*"
+      },
     ]
   })
 }

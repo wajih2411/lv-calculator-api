@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Camera system calculator: bandwidth, storage, power and UPS runtime</title>
+  <meta name="description" content="Rule-of-thumb sizing for IP camera systems: bandwidth, storage, PoE load, heat and UPS runtime.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <h1>Camera system calculator</h1>
+    <p>Size the network, storage, power and UPS for an IP camera system before you pick hardware.</p>
+  </header>
+
+  <main>
+    <div class="sheet">
+      <form id="calc-form" aria-labelledby="inputs-heading">
+        <h2 id="inputs-heading">System</h2>
+
+        <div class="field">
+          <label for="cameraCount">Cameras</label>
+          <input id="cameraCount" name="cameraCount" type="number" inputmode="numeric" min="1" step="1" required>
+        </div>
+
+        <div class="field">
+          <label for="resolution">Resolution</label>
+          <select id="resolution" name="resolution">
+            <option>1080p</option>
+            <option>4MP</option>
+            <option>5MP</option>
+            <option>4K</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="retentionDays">Retention <span class="unit">days</span></label>
+          <input id="retentionDays" name="retentionDays" type="number" inputmode="decimal" min="0.01" step="any" required>
+        </div>
+
+        <div class="field">
+          <label for="recordingHoursPerDay">Recording <span class="unit">hours per day</span></label>
+          <input id="recordingHoursPerDay" name="recordingHoursPerDay" type="number" inputmode="decimal" min="0.01" max="24" step="any" value="24">
+        </div>
+
+        <div class="field">
+          <label for="additionalLoadWatts">Switch and recorder load <span class="unit">W</span></label>
+          <input id="additionalLoadWatts" name="additionalLoadWatts" type="number" inputmode="decimal" min="0" step="any" value="0">
+        </div>
+
+        <div class="field">
+          <label for="upsBatteryWh">UPS battery <span class="unit">Wh, optional</span></label>
+          <input id="upsBatteryWh" name="upsBatteryWh" type="number" inputmode="decimal" min="0.01" step="any">
+        </div>
+
+        <details>
+          <summary>Assumptions</summary>
+          <div class="field">
+            <label for="wattsPerCamera">Power per camera <span class="unit">W</span></label>
+            <input id="wattsPerCamera" name="wattsPerCamera" type="number" inputmode="decimal" min="0.01" step="any" value="12.95" aria-describedby="watts-hint">
+            <p class="hint" id="watts-hint">12.95 W is the 802.3af PoE maximum at the camera.</p>
+          </div>
+          <div class="field">
+            <label for="upsEfficiency">UPS efficiency <span class="unit">0 to 1</span></label>
+            <input id="upsEfficiency" name="upsEfficiency" type="number" inputmode="decimal" min="0.01" max="1" step="any" value="0.9">
+          </div>
+        </details>
+
+        <button type="submit" id="submit">Calculate</button>
+        <p class="error" id="form-error" role="alert" hidden></p>
+        <p class="hint">Calculations are public and kept for 30 days. Don't enter client details.</p>
+      </form>
+
+      <section aria-labelledby="results-heading" aria-live="polite">
+        <h2 id="results-heading">Results</h2>
+        <table class="schedule">
+          <thead>
+            <tr><th scope="col">Quantity</th><th scope="col">Basis</th><th scope="col" class="num">Result</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Bitrate per camera</th>
+              <td class="basis" id="b-bitrate">resolution preset, H.264 at 15 fps</td>
+              <td class="num"><span class="value" id="v-bitrate">–</span> <span class="unit">Mbps</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Total bandwidth</th>
+              <td class="basis" id="b-bandwidth">cameras × bitrate</td>
+              <td class="num"><span class="value" id="v-bandwidth">–</span> <span class="unit">Mbps</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Storage</th>
+              <td class="basis" id="b-storage">bandwidth × hours per day × days</td>
+              <td class="num"><span class="value" id="v-storage">–</span> <span class="unit">TB</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Total load</th>
+              <td class="basis" id="b-load">cameras × power per camera + switch and recorder</td>
+              <td class="num"><span class="value" id="v-load">–</span> <span class="unit">W</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Heat load</th>
+              <td class="basis" id="b-heat">load × 3.412</td>
+              <td class="num"><span class="value" id="v-heat">–</span> <span class="unit">BTU/hr</span></td>
+            </tr>
+            <tr>
+              <th scope="row">UPS runtime</th>
+              <td class="basis" id="b-ups">battery × efficiency ÷ load × 60</td>
+              <td class="num"><span class="value" id="v-ups">–</span> <span class="unit">min</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hint">Rule-of-thumb estimates for early design. Confirm against manufacturer data before you specify equipment.</p>
+      </section>
+    </div>
+
+    <section class="history" aria-labelledby="history-heading">
+      <h2 id="history-heading">Recent calculations</h2>
+      <div class="scroll" role="region" aria-labelledby="history-heading" tabindex="0">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col" class="num">Cameras</th>
+              <th scope="col">Resolution</th>
+              <th scope="col" class="num">Retention</th>
+              <th scope="col" class="num">Storage</th>
+              <th scope="col" class="num">Load</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+      <p class="hint" id="history-status">Loading recent calculations.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built by Wajih Muhammad on AWS Lambda, API Gateway and DynamoDB. <a href="https://github.com/wajih2411/lv-calculator-api">Source on GitHub</a></p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
